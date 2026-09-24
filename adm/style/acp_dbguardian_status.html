@@ -1,0 +1,138 @@
+{% include 'overall_header.html' %}
+
+<h1>{{ lang('ACP_DBGUARDIAN_STATUS') }}</h1>
+{% include 'acp_dbguardian_badges.html' %}
+
+<p>{{ lang('DBGUARDIAN_STATUS_EXPLAIN') }}</p>
+
+<div class="dbg-state dbg-state-{{ DBG_STATE }}">
+	<span class="dbg-dot"></span>
+	<div>
+		<strong>{{ lang('DBGUARDIAN_STATE_TITLE_' ~ DBG_STATE|upper) }}</strong>
+		{{ DBG_STATE_TEXT }}
+	</div>
+</div>
+
+{% if not DBG_SAPI_OK %}
+<div class="errorbox">
+	<h3>{{ lang('DBGUARDIAN_WARN_SAPI_TITLE') }}</h3>
+	<p>{{ lang('DBGUARDIAN_WARN_SAPI', DBG_SAPI) }}</p>
+	<p class="dbg-mono">{{ DBG_HTACCESS_LINE }}</p>
+</div>
+{% elseif DBG_SAPI_LSAPI and DBG_STATE == 'pending' %}
+<div class="dbg-hint">
+	<h3>{{ lang('DBGUARDIAN_WARN_LSAPI_TITLE') }}</h3>
+	<p>{{ lang('DBGUARDIAN_WARN_LSAPI', DBG_CACHE_TTL) }}</p>
+	<p class="dbg-mono">{{ DBG_HTACCESS_LINE }}</p>
+</div>
+{% elseif DBG_INI_NAME == '' %}
+<div class="errorbox"><p>{{ lang('DBGUARDIAN_WARN_INI_DISABLED') }}</p></div>
+{% endif %}
+{% if DBG_NO_RECIPIENTS %}
+<div class="errorbox"><p>{{ lang('DBGUARDIAN_WARN_NO_RECIPIENTS') }}</p></div>
+{% endif %}
+{% if DBG_OUTDATED %}
+<div class="dbg-hint"><p>{{ lang('DBGUARDIAN_WARN_OUTDATED') }}</p></div>
+{% endif %}
+
+<form id="dbguardian_status" method="post" action="{{ U_ACTION }}">
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_ENVIRONMENT') }}</legend>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_ENV_SAPI') }}</label><br><span>{{ lang('DBGUARDIAN_ENV_SAPI_EXPLAIN') }}</span></dt>
+		<dd><span class="dbg-mono">{{ DBG_SAPI }}</span> {% if DBG_SAPI_OK %}<span class="dbg-ok">{{ lang('DBGUARDIAN_OK') }}</span>{% else %}<span class="dbg-ko">{{ lang('DBGUARDIAN_KO') }}</span>{% endif %}</dd>
+	</dl>
+	<dl>
+		<dt><label>user_ini.filename / user_ini.cache_ttl</label></dt>
+		<dd><span class="dbg-mono">{{ DBG_INI_NAME ?: lang('DBGUARDIAN_EMPTY') }}</span> / {{ lang('DBGUARDIAN_SECONDS', DBG_CACHE_TTL) }}</dd>
+	</dl>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_ENV_PREPEND') }}</label><br><span>{{ lang('DBGUARDIAN_ENV_PREPEND_EXPLAIN') }}</span></dt>
+		<dd><span class="dbg-mono">{{ DBG_ACTIVE_PREPEND ?: lang('DBGUARDIAN_EMPTY') }}</span> {% if DBG_OURS %}<span class="dbg-ok">{{ lang('DBGUARDIAN_OK') }}</span>{% endif %}</dd>
+	</dl>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_ENV_INI') }}</label></dt>
+		<dd><span class="dbg-mono">{{ DBG_INI_PATH }}</span><br>
+			{% if DBG_BLOCK_PRESENT %}<span class="dbg-ok">{{ lang('DBGUARDIAN_BLOCK_PRESENT') }}</span>{% else %}<span class="dbg-ko">{{ lang('DBGUARDIAN_BLOCK_MISSING') }}</span>{% endif %}
+			{% if not DBG_INI_WRITABLE %}<br><span class="dbg-ko">{{ lang('DBGUARDIAN_NOT_WRITABLE') }}</span>{% endif %}</dd>
+	</dl>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_ENV_STORE') }}</label></dt>
+		<dd><span class="dbg-mono">{{ DBG_STORE_DIR }}</span> {% if DBG_STORE_WRITABLE %}<span class="dbg-ok">{{ lang('DBGUARDIAN_WRITABLE') }}</span>{% else %}<span class="dbg-ko">{{ lang('DBGUARDIAN_NOT_WRITABLE') }}</span>{% endif %}</dd>
+	</dl>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_ENV_RUNTIME') }}</label></dt>
+		<dd>{% if DBG_DEPLOYED %}v{{ DBG_DEPLOYED }} {% if DBG_OUTDATED %}<span class="dbg-ko">{{ lang('DBGUARDIAN_OUTDATED') }}</span>{% else %}<span class="dbg-ok">{{ lang('DBGUARDIAN_UP_TO_DATE') }}</span>{% endif %}{% else %}<span class="dbg-ko">{{ lang('DBGUARDIAN_NOT_DEPLOYED') }}</span>{% endif %}</dd>
+	</dl>
+	{% if DBG_CHAIN %}
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_ENV_CHAIN') }}</label><br><span>{{ lang('DBGUARDIAN_ENV_CHAIN_EXPLAIN') }}</span></dt>
+		<dd class="dbg-mono">{{ DBG_CHAIN }}</dd>
+	</dl>
+	{% endif %}
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_ENV_MAIL') }}</label></dt>
+		<dd>{{ DBG_TRANSPORT }}{% if not DBG_MAIL_AVAILABLE %} <span class="dbg-ko">{{ lang('DBGUARDIAN_MAIL_FUNCTION_MISSING') }}</span>{% endif %}<br>{{ lang('DBGUARDIAN_ENV_RECIPIENTS') }}: {{ DBG_RECIPIENTS ?: lang('DBGUARDIAN_EMPTY') }}</dd>
+	</dl>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_ENV_EVENTS') }}</label></dt>
+		<dd>{{ lang('DBGUARDIAN_EVENTS_30', DBG_EVENTS_30) }}{% if DBG_LAST_EVENT %}<br>{{ lang('DBGUARDIAN_LAST_EVENT', DBG_LAST_EVENT) }}{% endif %}</dd>
+	</dl>
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_INSTALLATION') }}</legend>
+	<p>{{ lang('DBGUARDIAN_INSTALLATION_EXPLAIN', DBG_CACHE_TTL) }}</p>
+	<div class="dbg-actions">
+		<input type="submit" class="button1" name="dbg_install" value="{% if DBG_BLOCK_PRESENT %}{{ lang('DBGUARDIAN_REINSTALL') }}{% else %}{{ lang('DBGUARDIAN_INSTALL') }}{% endif %}">
+		<input type="submit" class="button2" name="dbg_redeploy" value="{{ lang('DBGUARDIAN_REDEPLOY') }}">
+		{% if DBG_BLOCK_PRESENT %}<input type="submit" class="button2" name="dbg_remove" value="{{ lang('DBGUARDIAN_REMOVE') }}">{% endif %}
+	</div>
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_TESTS') }}</legend>
+	<p>{{ lang('DBGUARDIAN_TESTS_EXPLAIN') }}</p>
+	<table class="table1 dbg-table">
+		<thead>
+			<tr>
+				<th>{{ lang('DBGUARDIAN_TEST_CATEGORY') }}</th>
+				<th>{{ lang('DBGUARDIAN_TEST_PREVIEW') }}</th>
+				<th>{{ lang('DBGUARDIAN_TEST_LIVE') }}</th>
+			</tr>
+		</thead>
+		<tbody>
+		{% for p in previews %}
+			<tr>
+				<td>{{ p.LABEL }}</td>
+				<td><a href="{{ p.U_IT }}" target="_blank" rel="noopener">{{ lang('DBGUARDIAN_LANG_IT') }}</a> | <a href="{{ p.U_EN }}" target="_blank" rel="noopener">{{ lang('DBGUARDIAN_LANG_EN') }}</a></td>
+				<td>{% if S_LIVE_AVAILABLE %}<a href="{{ p.U_LIVE }}" target="_blank" rel="noopener">{{ lang('DBGUARDIAN_OPEN_LIVE') }}</a>{% else %}<span class="dbg-ko">{{ lang('DBGUARDIAN_LIVE_UNAVAILABLE') }}</span>{% endif %}</td>
+			</tr>
+		{% endfor %}
+		</tbody>
+	</table>
+	{% if S_LIVE_AVAILABLE %}
+	<p><small>{{ lang('DBGUARDIAN_LIVE_EXPLAIN') }}</small></p>
+	{% else %}
+	<div class="dbg-hint"><p>{{ DBG_LIVE_REASON }}</p></div>
+	{% endif %}
+
+	<div class="dbg-actions">
+		<input type="submit" class="button1" name="dbg_test_mail" value="{{ lang('DBGUARDIAN_SEND_TEST_MAIL') }}">
+		{% if DBG_DEBUG_ON %}
+		<input type="submit" class="button2" name="dbg_debug_off" value="{{ lang('DBGUARDIAN_DEBUG_OFF') }}">
+		{% else %}
+		<input type="submit" class="button2" name="dbg_debug_on" value="{{ lang('DBGUARDIAN_DEBUG_ON') }}">
+		{% endif %}
+		<input type="submit" class="button2" name="dbg_new_key" value="{{ lang('DBGUARDIAN_NEW_KEY') }}">
+		<input type="submit" class="button2" name="dbg_reset_state" value="{{ lang('DBGUARDIAN_RESET_STATE') }}">
+	</div>
+	<p><small>{{ lang('DBGUARDIAN_DEBUG_EXPLAIN') }}</small></p>
+</fieldset>
+
+{{ S_FORM_TOKEN }}
+</form>
+
+{% include 'acp_dbguardian_credits.html' %}
+{% include 'overall_footer.html' %}

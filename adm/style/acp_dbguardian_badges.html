@@ -1,0 +1,49 @@
+<div class="dbg-badges">
+	<span class="dbg-badge dbg-badge-ext"><strong>{{ DBG_EXT_NAME }}</strong> v{{ DBG_EXT_VERSION }}</span>
+	<span class="dbg-badge">phpBB {{ DBG_PHPBB_VERSION }}</span>
+	<span class="dbg-badge">PHP {{ DBG_PHP_VERSION }}</span>
+	<span class="dbg-badge">{{ lang('DBGUARDIAN_BADGE_LICENSE', DBG_LICENSE) }}</span>
+	<span class="dbg-badge {% if DBG_BADGE_ACTIVE %}dbg-badge-ok{% else %}dbg-badge-warn{% endif %}">{% if DBG_BADGE_ACTIVE %}{{ lang('DBGUARDIAN_BADGE_ACTIVE') }}{% else %}{{ lang('DBGUARDIAN_BADGE_INACTIVE') }}{% endif %}</span>
+</div>
+{% if DBG_EXT_MISMATCH %}
+<div class="errorbox"><p>{{ lang('DBGUARDIAN_VERSION_MISMATCH', DBG_DB_VERSION) }}</p></div>
+{% endif %}
+<style>
+.dbg-badges{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 14px}
+.dbg-badge{display:inline-block;padding:3px 10px;border:1px solid #c9d3e0;border-radius:12px;background:#f3f6fa;color:#394a61;font-size:.95em;line-height:1.5}
+.dbg-badge-ext{background:#22577a;border-color:#22577a;color:#fff}
+.dbg-badge-ok{background:#e6f4ea;border-color:#9dd3ad;color:#1e6b35}
+.dbg-badge-warn{background:#fff4e0;border-color:#f0c77a;color:#8a5300}
+.dbg-state{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:6px;margin:0 0 16px;border:1px solid}
+.dbg-state strong{display:block;font-size:1.15em;margin-bottom:2px}
+.dbg-state-active{background:#e9f6ed;border-color:#9dd3ad;color:#1e5a31}
+.dbg-state-pending{background:#fff7e6;border-color:#f0c77a;color:#6f4500}
+.dbg-state-inactive,.dbg-state-disabled{background:#fdecec;border-color:#eab0b0;color:#7a1d1d}
+.dbg-dot{flex:0 0 12px;height:12px;border-radius:50%;margin-top:5px;background:currentColor}
+.dbg-ok{color:#1e6b35;font-weight:bold}
+.dbg-ko{color:#a11d1d;font-weight:bold}
+.dbg-mono{font-family:Consolas,Menlo,monospace;font-size:.95em;word-break:break-all}
+.dbg-actions{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+.dbg-actions .button1,.dbg-actions .button2{margin:0}
+table.dbg-table td{vertical-align:top}
+.dbg-pills{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.dbg-pills a{padding:3px 10px;border:1px solid #c9d3e0;border-radius:12px;text-decoration:none}
+.dbg-pills a.dbg-current{background:#22577a;border-color:#22577a;color:#fff}
+.dbg-cat{display:inline-block;padding:1px 8px;border-radius:10px;font-size:.9em;white-space:nowrap}
+.dbg-cat-db_connect{background:#fdecec;color:#7a1d1d}
+.dbg-cat-db_query{background:#fff4e0;color:#8a5300}
+.dbg-cat-php_fatal{background:#f1e8fb;color:#5b2c8a}
+.dbg-cat-app{background:#eef1f6;color:#394a61}
+.dbg-cat-recovery{background:#e6f4ea;color:#1e6b35}
+.dbg-mail-sent{color:#1e6b35}
+.dbg-mail-failed{color:#a11d1d;font-weight:bold}
+.dbg-mail-throttled,.dbg-mail-off{color:#6b7280}
+details.dbg-detail summary{cursor:pointer;color:#105289}
+details.dbg-detail pre{white-space:pre-wrap;word-break:break-word;background:#f3f6fa;padding:6px 8px;margin:4px 0;font-size:.9em;max-height:260px;overflow:auto}
+.dbg-hint{margin:0 0 16px;padding:10px 14px;border:1px solid #f0c77a;border-left-width:5px;border-radius:4px;background:#fff8ea;color:#5c3b00}
+.dbg-hint h3{margin:0 0 6px;color:#5c3b00;font-size:1.1em;border:0;text-transform:none}
+.dbg-hint p{margin:0 0 6px}
+.dbg-credits{clear:both;margin:24px 0 6px;padding:10px 14px;border-top:2px solid #c9d3e0;text-align:center;color:#536482;font-size:.95em;line-height:1.6}
+.dbg-credits p{margin:0}
+.dbg-credits .dbg-sep{color:#b3bfcd;margin:0 6px}
+</style>

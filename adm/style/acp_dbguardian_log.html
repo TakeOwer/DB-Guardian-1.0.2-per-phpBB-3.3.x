@@ -1,0 +1,76 @@
+{% include 'overall_header.html' %}
+
+<h1>{{ lang('ACP_DBGUARDIAN_LOG') }}</h1>
+{% include 'acp_dbguardian_badges.html' %}
+
+<p>{{ lang('DBGUARDIAN_LOG_EXPLAIN') }}</p>
+
+<div class="dbg-pills">
+	<a href="{{ U_ACTION }}"{% if not S_FILTER %} class="dbg-current"{% endif %}>{{ lang('DBGUARDIAN_FILTER_ALL') }}</a>
+	{% for f in filters %}
+	<a href="{{ U_ACTION }}&amp;cat={{ f.VALUE }}"{% if f.SELECTED %} class="dbg-current"{% endif %}>{{ f.LABEL }}</a>
+	{% endfor %}
+</div>
+
+<form id="dbguardian_log" method="post" action="{{ U_ACTION }}">
+
+<div class="pagination">
+	{{ lang('DBGUARDIAN_TOTAL_EVENTS', TOTAL_EVENTS) }}
+	{% if pagination|length %}
+		{% include 'pagination.html' %}
+	{% endif %}
+</div>
+
+<table class="table1 zebra-table dbg-table">
+	<thead>
+		<tr>
+			<th style="width:15%">{{ lang('DBGUARDIAN_COL_TIME') }}</th>
+			<th style="width:15%">{{ lang('DBGUARDIAN_COL_TYPE') }}</th>
+			<th style="width:10%">{{ lang('DBGUARDIAN_COL_CODE') }}</th>
+			<th>{{ lang('DBGUARDIAN_COL_MESSAGE') }}</th>
+			<th style="width:12%">{{ lang('DBGUARDIAN_COL_MAIL') }}</th>
+		</tr>
+	</thead>
+	<tbody>
+	{% for e in events %}
+		<tr>
+			<td>{{ e.TIME }}<br><span class="dbg-mono">{{ e.REF }}</span></td>
+			<td><span class="dbg-cat dbg-cat-{{ e.CATEGORY }}">{{ e.CAT_LABEL }}</span>{% if e.REPEATS %}<br><small>{{ lang('DBGUARDIAN_REPEATS', e.REPEATS) }}</small>{% endif %}</td>
+			<td class="dbg-mono">{{ e.CODE }}</td>
+			<td>
+				{{ e.MESSAGE }}
+				<details class="dbg-detail">
+					<summary>{{ lang('DBGUARDIAN_DETAILS') }}</summary>
+					{% if e.HINT %}<p><strong>{{ lang('DBGUARDIAN_HINT') }}</strong> {{ e.HINT }}</p>{% endif %}
+					{% if e.URL %}<p><strong>{{ lang('DBGUARDIAN_COL_URL') }}</strong> <span class="dbg-mono">{{ e.URL }}</span></p>{% endif %}
+					{% if e.IP or e.UA %}<p><strong>{{ lang('DBGUARDIAN_COL_VISITOR') }}</strong> {{ e.IP }} {{ e.UA }}</p>{% endif %}
+					{% if e.TITLE %}<p><strong>{{ lang('DBGUARDIAN_COL_SOURCE') }}</strong> {{ e.TITLE }}</p>{% endif %}
+					{% if e.FILE %}<p><strong>{{ lang('DBGUARDIAN_COL_FILE') }}</strong> <span class="dbg-mono">{{ e.FILE }}</span></p>{% endif %}
+					{% if e.SQL %}<strong>SQL</strong><pre>{{ e.SQL }}</pre>{% endif %}
+					{% if e.TRACE %}<strong>{{ lang('DBGUARDIAN_COL_TRACE') }}</strong><pre>{{ e.TRACE }}</pre>{% endif %}
+				</details>
+			</td>
+			<td><span class="dbg-mail-{{ e.MAIL_STATE }}">{{ e.MAIL_TEXT }}</span>{% if e.MAIL_ERROR %}<br><small>{{ e.MAIL_ERROR }}</small>{% endif %}</td>
+		</tr>
+	{% else %}
+		<tr><td colspan="5" style="text-align:center">{{ lang('DBGUARDIAN_NO_EVENTS') }}</td></tr>
+	{% endfor %}
+	</tbody>
+</table>
+
+<div class="pagination">
+	{% if pagination|length %}
+		{% include 'pagination.html' %}
+	{% endif %}
+</div>
+
+{% if TOTAL_EVENTS %}
+<fieldset class="quick">
+	<input class="button2" type="submit" name="clear_log" value="{{ lang('DBGUARDIAN_LOG_CLEAR') }}">
+</fieldset>
+{% endif %}
+{{ S_FORM_TOKEN }}
+</form>
+
+{% include 'acp_dbguardian_credits.html' %}
+{% include 'overall_footer.html' %}

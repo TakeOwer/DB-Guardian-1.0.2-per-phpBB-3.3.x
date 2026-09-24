@@ -1,0 +1,187 @@
+{% include 'overall_header.html' %}
+
+<h1>{{ lang('ACP_DBGUARDIAN_SETTINGS') }}</h1>
+{% include 'acp_dbguardian_badges.html' %}
+
+<p>{{ lang('DBGUARDIAN_SETTINGS_EXPLAIN', CONFIG_PATH) }}</p>
+
+{% if S_ERROR %}
+<div class="errorbox"><h3>{{ lang('WARNING') }}</h3><p>{{ ERROR_MSG }}</p></div>
+{% endif %}
+
+<form id="dbguardian_settings" method="post" action="{{ U_ACTION }}">
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_GROUP_PAGE') }}</legend>
+	<dl>
+		<dt><label for="enabled">{{ lang('DBGUARDIAN_ENABLED') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_ENABLED_EXPLAIN') }}</span></dt>
+		<dd><label><input type="radio" class="radio" id="enabled" name="enabled" value="1"{% if ENABLED %} checked="checked"{% endif %}> {{ lang('YES') }}</label>
+			<label><input type="radio" class="radio" name="enabled" value="0"{% if not ENABLED %} checked="checked"{% endif %}> {{ lang('NO') }}</label></dd>
+	</dl>
+	<dl>
+		<dt><label for="board_name">{{ lang('DBGUARDIAN_BOARD_NAME') }}{{ lang('COLON') }}</label></dt>
+		<dd><input type="text" class="text medium" id="board_name" name="board_name" value="{{ BOARD_NAME }}" maxlength="120"></dd>
+	</dl>
+	<dl>
+		<dt><label for="board_url">{{ lang('DBGUARDIAN_BOARD_URL') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_BOARD_URL_EXPLAIN') }}</span></dt>
+		<dd><input type="url" class="text medium" id="board_url" name="board_url" value="{{ BOARD_URL }}" maxlength="255"></dd>
+	</dl>
+	<dl>
+		<dt><label for="contact_email">{{ lang('DBGUARDIAN_CONTACT_EMAIL') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_CONTACT_EMAIL_EXPLAIN') }}</span></dt>
+		<dd><input type="email" class="text medium" id="contact_email" name="contact_email" value="{{ CONTACT_EMAIL }}" maxlength="120"></dd>
+	</dl>
+	<dl>
+		<dt><label for="page_language">{{ lang('DBGUARDIAN_PAGE_LANGUAGE') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_PAGE_LANGUAGE_EXPLAIN') }}</span></dt>
+		<dd><select id="page_language" name="page_language">
+			<option value="auto"{% if PAGE_LANGUAGE == 'auto' %} selected="selected"{% endif %}>{{ lang('DBGUARDIAN_LANG_AUTO') }}</option>
+			<option value="it"{% if PAGE_LANGUAGE == 'it' %} selected="selected"{% endif %}>{{ lang('DBGUARDIAN_LANG_IT') }}</option>
+			<option value="en"{% if PAGE_LANGUAGE == 'en' %} selected="selected"{% endif %}>{{ lang('DBGUARDIAN_LANG_EN') }}</option>
+		</select></dd>
+	</dl>
+	<dl>
+		<dt><label for="timezone">{{ lang('DBGUARDIAN_TIMEZONE') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_TIMEZONE_EXPLAIN') }}</span></dt>
+		<dd><input type="text" class="text medium" id="timezone" name="timezone" value="{{ TIMEZONE }}" maxlength="64"></dd>
+	</dl>
+	<dl>
+		<dt><label for="retry_seconds">{{ lang('DBGUARDIAN_RETRY_SECONDS') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_RETRY_SECONDS_EXPLAIN') }}</span></dt>
+		<dd><input type="number" class="text" id="retry_seconds" name="retry_seconds" value="{{ RETRY_SECONDS }}" min="0" max="3600"> {{ lang('DBGUARDIAN_SECONDS_UNIT') }}</dd>
+	</dl>
+	<dl>
+		<dt><label for="status_url">{{ lang('DBGUARDIAN_STATUS_URL') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_STATUS_URL_EXPLAIN') }}</span></dt>
+		<dd><input type="url" class="text medium" id="status_url" name="status_url" value="{{ STATUS_URL }}" maxlength="255"></dd>
+	</dl>
+	<dl>
+		<dt><label for="logo_url">{{ lang('DBGUARDIAN_LOGO_URL') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_LOGO_URL_EXPLAIN') }}</span></dt>
+		<dd><input type="text" class="text medium" id="logo_url" name="logo_url" value="{{ LOGO_URL }}" maxlength="255"></dd>
+	</dl>
+	<dl>
+		<dt><label for="accent_color">{{ lang('DBGUARDIAN_ACCENT') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_ACCENT_EXPLAIN') }}</span></dt>
+		<dd><input type="color" id="accent_color" name="accent_color" value="{{ ACCENT_COLOR }}"></dd>
+	</dl>
+	<dl>
+		<dt><label for="custom_message">{{ lang('DBGUARDIAN_CUSTOM_MESSAGE') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_CUSTOM_MESSAGE_EXPLAIN') }}</span></dt>
+		<dd><textarea id="custom_message" name="custom_message" rows="3" cols="45" maxlength="1000">{{ CUSTOM_MESSAGE }}</textarea></dd>
+	</dl>
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_GROUP_INTERCEPT') }}</legend>
+	<dl>
+		<dt><label for="intercept">{{ lang('DBGUARDIAN_INTERCEPT') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_INTERCEPT_EXPLAIN') }}</span></dt>
+		<dd><select id="intercept" name="intercept">
+			<option value="all"{% if INTERCEPT == 'all' %} selected="selected"{% endif %}>{{ lang('DBGUARDIAN_INTERCEPT_ALL') }}</option>
+			<option value="db"{% if INTERCEPT == 'db' %} selected="selected"{% endif %}>{{ lang('DBGUARDIAN_INTERCEPT_DB') }}</option>
+		</select></dd>
+	</dl>
+	<dl>
+		<dt><label for="catch_fatal">{{ lang('DBGUARDIAN_CATCH_FATAL') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_CATCH_FATAL_EXPLAIN') }}</span></dt>
+		<dd><label><input type="radio" class="radio" id="catch_fatal" name="catch_fatal" value="1"{% if CATCH_FATAL %} checked="checked"{% endif %}> {{ lang('YES') }}</label>
+			<label><input type="radio" class="radio" name="catch_fatal" value="0"{% if not CATCH_FATAL %} checked="checked"{% endif %}> {{ lang('NO') }}</label></dd>
+	</dl>
+	<dl>
+		<dt><label for="exclude_paths">{{ lang('DBGUARDIAN_EXCLUDE') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_EXCLUDE_EXPLAIN') }}</span></dt>
+		<dd><textarea id="exclude_paths" name="exclude_paths" rows="3" cols="45">{{ EXCLUDE_PATHS }}</textarea></dd>
+	</dl>
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_GROUP_ALERTS') }}</legend>
+	<dl>
+		<dt><label for="admin_emails">{{ lang('DBGUARDIAN_ADMIN_EMAILS') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_ADMIN_EMAILS_EXPLAIN') }}</span></dt>
+		<dd><input type="text" class="text medium" id="admin_emails" name="admin_emails" value="{{ ADMIN_EMAILS }}" maxlength="500"></dd>
+	</dl>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_NOTIFY') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_NOTIFY_EXPLAIN') }}</span></dt>
+		<dd>
+		{% for n in notify %}
+			<label><input type="checkbox" class="radio" name="notify[]" value="{{ n.VALUE }}"{% if n.CHECKED %} checked="checked"{% endif %}> <strong>{{ n.LABEL }}</strong></label><br><span class="explain">{{ n.EXPLAIN }}</span><br>
+		{% endfor %}
+		</dd>
+	</dl>
+	<dl>
+		<dt><label for="notify_recovery">{{ lang('DBGUARDIAN_NOTIFY_RECOVERY') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_NOTIFY_RECOVERY_EXPLAIN') }}</span></dt>
+		<dd><label><input type="radio" class="radio" id="notify_recovery" name="notify_recovery" value="1"{% if NOTIFY_RECOVERY %} checked="checked"{% endif %}> {{ lang('YES') }}</label>
+			<label><input type="radio" class="radio" name="notify_recovery" value="0"{% if not NOTIFY_RECOVERY %} checked="checked"{% endif %}> {{ lang('NO') }}</label></dd>
+	</dl>
+	<dl>
+		<dt><label for="throttle_minutes">{{ lang('DBGUARDIAN_THROTTLE') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_THROTTLE_EXPLAIN') }}</span></dt>
+		<dd><input type="number" class="text" id="throttle_minutes" name="throttle_minutes" value="{{ THROTTLE_MINUTES }}" min="1" max="1440"> {{ lang('DBGUARDIAN_MINUTES_UNIT') }}</dd>
+	</dl>
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_GROUP_MAIL') }}</legend>
+	<p>{{ lang('DBGUARDIAN_GROUP_MAIL_EXPLAIN') }}</p>
+	<dl>
+		<dt><label for="mail_transport">{{ lang('DBGUARDIAN_TRANSPORT') }}{{ lang('COLON') }}</label></dt>
+		<dd><label><input type="radio" class="radio" id="mail_transport" name="mail_transport" value="mail"{% if MAIL_TRANSPORT == 'mail' %} checked="checked"{% endif %}> {{ lang('DBGUARDIAN_TRANSPORT_MAIL') }}</label>
+			<label><input type="radio" class="radio" name="mail_transport" value="smtp"{% if MAIL_TRANSPORT == 'smtp' %} checked="checked"{% endif %}> {{ lang('DBGUARDIAN_TRANSPORT_SMTP') }}</label></dd>
+	</dl>
+	<dl>
+		<dt><label for="mail_from">{{ lang('DBGUARDIAN_MAIL_FROM') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_MAIL_FROM_EXPLAIN') }}</span></dt>
+		<dd><input type="email" class="text medium" id="mail_from" name="mail_from" value="{{ MAIL_FROM }}" maxlength="120"></dd>
+	</dl>
+	<dl>
+		<dt><label for="mail_from_name">{{ lang('DBGUARDIAN_MAIL_FROM_NAME') }}{{ lang('COLON') }}</label></dt>
+		<dd><input type="text" class="text medium" id="mail_from_name" name="mail_from_name" value="{{ MAIL_FROM_NAME }}" maxlength="120"></dd>
+	</dl>
+	<dl>
+		<dt><label for="mail_f_param">{{ lang('DBGUARDIAN_MAIL_F') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_MAIL_F_EXPLAIN') }}</span></dt>
+		<dd><label><input type="radio" class="radio" id="mail_f_param" name="mail_f_param" value="1"{% if MAIL_F_PARAM %} checked="checked"{% endif %}> {{ lang('YES') }}</label>
+			<label><input type="radio" class="radio" name="mail_f_param" value="0"{% if not MAIL_F_PARAM %} checked="checked"{% endif %}> {{ lang('NO') }}</label></dd>
+	</dl>
+	<dl>
+		<dt><label for="smtp_host">{{ lang('DBGUARDIAN_SMTP_HOST') }}{{ lang('COLON') }}</label></dt>
+		<dd><input type="text" class="text medium" id="smtp_host" name="smtp_host" value="{{ SMTP_HOST }}" maxlength="255"></dd>
+	</dl>
+	<dl>
+		<dt><label for="smtp_port">{{ lang('DBGUARDIAN_SMTP_PORT') }}{{ lang('COLON') }}</label></dt>
+		<dd><input type="number" class="text" id="smtp_port" name="smtp_port" value="{{ SMTP_PORT }}" min="1" max="65535"></dd>
+	</dl>
+	<dl>
+		<dt><label for="smtp_security">{{ lang('DBGUARDIAN_SMTP_SECURITY') }}{{ lang('COLON') }}</label></dt>
+		<dd><select id="smtp_security" name="smtp_security">
+			<option value="tls"{% if SMTP_SECURITY == 'tls' %} selected="selected"{% endif %}>STARTTLS (587)</option>
+			<option value="ssl"{% if SMTP_SECURITY == 'ssl' %} selected="selected"{% endif %}>SSL/TLS (465)</option>
+			<option value="none"{% if SMTP_SECURITY == 'none' %} selected="selected"{% endif %}>{{ lang('DBGUARDIAN_SMTP_NONE_SECURITY') }}</option>
+		</select></dd>
+	</dl>
+	<dl>
+		<dt><label for="smtp_user">{{ lang('DBGUARDIAN_SMTP_USER') }}{{ lang('COLON') }}</label></dt>
+		<dd><input type="text" class="text medium" id="smtp_user" name="smtp_user" value="{{ SMTP_USER }}" maxlength="255" autocomplete="off"></dd>
+	</dl>
+	<dl>
+		<dt><label for="smtp_pass">{{ lang('DBGUARDIAN_SMTP_PASS') }}{{ lang('COLON') }}</label><br><span>{% if SMTP_PASS_SET %}{{ lang('DBGUARDIAN_SMTP_PASS_SET') }}{% else %}{{ lang('DBGUARDIAN_SMTP_PASS_EMPTY') }}{% endif %}</span></dt>
+		<dd><input type="password" class="text medium" id="smtp_pass" name="smtp_pass" value="" maxlength="255" autocomplete="new-password">
+			{% if SMTP_PASS_SET %}<br><label><input type="checkbox" class="radio" name="smtp_pass_clear" value="1"> {{ lang('DBGUARDIAN_SMTP_PASS_CLEAR') }}</label>{% endif %}</dd>
+	</dl>
+	<dl>
+		<dt><label for="smtp_verify_peer">{{ lang('DBGUARDIAN_SMTP_VERIFY') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_SMTP_VERIFY_EXPLAIN') }}</span></dt>
+		<dd><label><input type="radio" class="radio" id="smtp_verify_peer" name="smtp_verify_peer" value="1"{% if SMTP_VERIFY_PEER %} checked="checked"{% endif %}> {{ lang('YES') }}</label>
+			<label><input type="radio" class="radio" name="smtp_verify_peer" value="0"{% if not SMTP_VERIFY_PEER %} checked="checked"{% endif %}> {{ lang('NO') }}</label></dd>
+	</dl>
+	{% if S_PHPBB_SMTP %}
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_SMTP_IMPORT') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_SMTP_IMPORT_EXPLAIN', PHPBB_SMTP_HOST) }}</span></dt>
+		<dd><input type="submit" class="button2" name="import_smtp" value="{{ lang('DBGUARDIAN_SMTP_IMPORT_BUTTON') }}"></dd>
+	</dl>
+	{% endif %}
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_GROUP_LOG') }}</legend>
+	<dl>
+		<dt><label for="log_months">{{ lang('DBGUARDIAN_LOG_MONTHS') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_LOG_MONTHS_EXPLAIN') }}</span></dt>
+		<dd><input type="number" class="text" id="log_months" name="log_months" value="{{ LOG_MONTHS }}" min="1" max="36"> {{ lang('DBGUARDIAN_MONTHS_UNIT') }}</dd>
+	</dl>
+</fieldset>
+
+<fieldset class="submit-buttons">
+	<input class="button1" type="submit" id="submit" name="submit" value="{{ lang('SUBMIT') }}">&nbsp;
+	<input class="button2" type="reset" id="reset" name="reset" value="{{ lang('RESET') }}">
+	{{ S_FORM_TOKEN }}
+</fieldset>
+</form>
+
+{% include 'acp_dbguardian_credits.html' %}
+{% include 'overall_footer.html' %}
