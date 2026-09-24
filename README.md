@@ -9,6 +9,27 @@
 
 Sostituisce l'"Errore generale" di phpBB, le pagine bianche e gli errori 500 con una pagina di servizio responsive. La pagina spiega al visitatore cosa è successo e mostra codice errore, riferimento, data e ora. Contemporaneamente l'estensione avvisa l'amministratore via e-mail, anche quando il database è completamente irraggiungibile.
 
+A brief and clear description of what your extension does and what problem it solves for phpBB communities.
+---
+## Features
+
+- **Feature 1:** Detailed explanation of feature 1.
+- **Feature 2:** Detailed explanation of feature 2.
+- **Feature 3:** Fully customizable via the Administration Control Panel (ACP).
+- **Multi-language Support:** Ready for translation (includes English, Italian, etc.).
+---
+## Requirements
+
+- **phpBB:** `>= 3.3.0`
+- **PHP:** `>= 7.4` (PHP 8.x fully supported)
+---
+## Installation
+
+1. **Download** the latest package from the [Releases](https://github.com/username/repository/releases) page.
+2. **Extract** the archive and upload the files to:
+   ```text
+   phpBB_root/ext/author/extensionname/
+
 ## Perché non è una normale estensione
 
 Quando MySQL non risponde, phpBB si ferma prima di caricare le estensioni. Per questo DB Guardian installa un piccolo file, il "guardiano", che PHP carica prima di phpBB tramite la direttiva `auto_prepend_file` nel file `.user.ini` della cartella del forum. Il guardiano non usa mai il database: la configurazione sta in un file e le e-mail partono con `mail()` o con il suo client SMTP.
