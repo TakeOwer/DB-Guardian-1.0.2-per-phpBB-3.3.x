@@ -21,6 +21,7 @@ class main_info
 				'status'   => ['title' => 'ACP_DBGUARDIAN_STATUS', 'auth' => 'ext_salvocortesiano/dbguardian && acl_a_board', 'cat' => ['ACP_DBGUARDIAN_TITLE']],
 				'settings' => ['title' => 'ACP_DBGUARDIAN_SETTINGS', 'auth' => 'ext_salvocortesiano/dbguardian && acl_a_board', 'cat' => ['ACP_DBGUARDIAN_TITLE']],
 				'log'      => ['title' => 'ACP_DBGUARDIAN_LOG', 'auth' => 'ext_salvocortesiano/dbguardian && acl_a_board', 'cat' => ['ACP_DBGUARDIAN_TITLE']],
+				'monitor'  => ['title' => 'ACP_DBGUARDIAN_MONITOR', 'auth' => 'ext_salvocortesiano/dbguardian && acl_a_board', 'cat' => ['ACP_DBGUARDIAN_TITLE']],
 			],
 		];
 	}

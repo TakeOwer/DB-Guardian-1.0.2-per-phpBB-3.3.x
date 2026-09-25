@@ -23,6 +23,7 @@ class ext extends \phpbb\extension\base
 	 */
 	public function enable_step($old_state)
 	{
+		$this->load_language();
 		$result = parent::enable_step($old_state === 'dbguardian_deployed' ? false : $old_state);
 
 		if ($result === false && $old_state !== 'dbguardian_deployed')
@@ -57,6 +58,7 @@ class ext extends \phpbb\extension\base
 
 	public function purge_step($old_state)
 	{
+		$this->load_language();
 		if ($old_state === false)
 		{
 			$manager = $this->manager();
@@ -66,6 +68,22 @@ class ext extends \phpbb\extension\base
 			return 'dbguardian_purged';
 		}
 		return parent::purge_step($old_state === 'dbguardian_purged' ? false : $old_state);
+	}
+
+	/**
+	 * While the extension is being enabled its language files are not loaded yet, so phpBB
+	 * would write the raw keys (ACP_DBGUARDIAN_...) in the admin log for the modules it adds.
+	 */
+	protected function load_language()
+	{
+		try
+		{
+			$this->container->get('language')->add_lang('info_acp_dbguardian', 'salvocortesiano/dbguardian');
+		}
+		catch (\Exception $e)
+		{
+			// The admin log would only show the raw names.
+		}
 	}
 
 	/**

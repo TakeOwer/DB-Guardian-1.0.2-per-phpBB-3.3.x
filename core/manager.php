@@ -160,6 +160,10 @@ class manager
 		{
 			$cfg['debug_key'] = bin2hex(random_bytes(16));
 		}
+		if (strlen((string) $cfg['health_key']) < 16)
+		{
+			$cfg['health_key'] = bin2hex(random_bytes(16));
+		}
 
 		$php = "<?php\n// DB Guardian - configurazione generata dal pannello di amministrazione.\n"
 			. "// Salvata in un file e non nel database: deve funzionare proprio quando il database non risponde.\n"
@@ -453,6 +457,121 @@ class manager
 		$html = '<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;color:#1f2433">'
 			. nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8')) . '</div>';
 		return \DbGuardianCore::send_mail($to, '[' . $board . '] E-mail di prova di DB Guardian', $text, $html);
+	}
+
+	// ------------------------------------------------------------------
+	// External monitoring (health endpoint + watchdog)
+	// ------------------------------------------------------------------
+
+	public function watchdog_defaults()
+	{
+		return [
+			'interval'        => 1,
+			'threshold'       => 2,
+			'timeout'         => 20,
+			'realert_minutes' => 60,
+			'ssl_warn_days'   => 14,
+			'recipients'      => '',
+			'smtp_host'       => '',
+			'smtp_port'       => 465,
+			'smtp_security'   => 'ssl',
+			'smtp_user'       => '',
+			'smtp_pass'       => '',
+			'smtp_from'       => '',
+			'smtp_from_name'  => 'DB Guardian watchdog',
+			'smtp_verify'     => true,
+			'telegram_token'  => '',
+			'telegram_chat'   => '',
+		];
+	}
+
+	public function watchdog_settings(array $cfg)
+	{
+		return array_merge($this->watchdog_defaults(), is_array($cfg['watchdog']) ? $cfg['watchdog'] : []);
+	}
+
+	/**
+	 * Public address of the endpoint, built from this installation.
+	 */
+	public function health_url(array $cfg)
+	{
+		$base = function_exists('generate_board_url') ? generate_board_url() : rtrim((string) $cfg['board_url'], '/');
+		return $base . '/index.php?dbguardian_health=' . rawurlencode((string) $cfg['health_key']);
+	}
+
+	/**
+	 * The same check the endpoint runs, executed right now from the ACP.
+	 */
+	public function health_probe()
+	{
+		$cfg = $this->load();
+		if (!method_exists('DbGuardianCore', 'health_data'))
+		{
+			// The previous version of the guardian is still loaded in this request.
+			return ['ok' => false, 'db' => 'skip', 'db_ms' => 0, 'db_code' => 0, 'db_error' => 'RELOAD'];
+		}
+		\DbGuardianCore::configure($this->store_dir(), $cfg);
+		return \DbGuardianCore::health_data();
+	}
+
+	/**
+	 * Last request received on the endpoint (normally the watchdog).
+	 */
+	public function last_health_request()
+	{
+		$raw = @file_get_contents($this->store_dir() . '/state/health.json');
+		$data = is_string($raw) ? json_decode($raw, true) : null;
+		return is_array($data) ? $data : [];
+	}
+
+	/**
+	 * The watchdog script with its settings filled in.
+	 */
+	public function watchdog_script(array $cfg)
+	{
+		$template = @file_get_contents($this->board_root() . '/ext/salvocortesiano/dbguardian/watchdog/dbguardian_watchdog.py');
+		if (!is_string($template) || strpos($template, '__DBGUARDIAN_CONFIG__') === false)
+		{
+			return false;
+		}
+		$w = $this->watchdog_settings($cfg);
+		$recipients = preg_split('/[\s,;]+/', (string) $w['recipients'], -1, PREG_SPLIT_NO_EMPTY);
+
+		$settings = [
+			'board_name'      => (string) $cfg['board_name'],
+			'health_url'      => $this->health_url($cfg),
+			'timezone'        => (string) $cfg['timezone'],
+			'threshold'       => (int) $w['threshold'],
+			'timeout'         => (int) $w['timeout'],
+			'realert_minutes' => (int) $w['realert_minutes'],
+			'ssl_warn_days'   => (int) $w['ssl_warn_days'],
+			'recipients'      => array_values($recipients),
+			'smtp'            => [
+				'host'      => (string) $w['smtp_host'],
+				'port'      => (int) $w['smtp_port'],
+				'security'  => (string) $w['smtp_security'],
+				'user'      => (string) $w['smtp_user'],
+				'pass'      => (string) $w['smtp_pass'],
+				'from'      => (string) $w['smtp_from'],
+				'from_name' => (string) $w['smtp_from_name'],
+				'verify'    => (bool) $w['smtp_verify'],
+			],
+			'telegram'        => [
+				'token'   => (string) $w['telegram_token'],
+				'chat_id' => (string) $w['telegram_chat'],
+			],
+		];
+
+		// No apostrophes in the JSON (JSON_HEX_APOS): it sits inside a Python r'''...''' string.
+		$json = json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_APOS);
+		return str_replace('__DBGUARDIAN_CONFIG__', $json, $template);
+	}
+
+	public function cron_line(array $cfg, $path)
+	{
+		$interval = (int) $this->watchdog_settings($cfg)['interval'];
+		$when = $interval <= 1 ? '* * * * *' : '*/' . $interval . ' * * * *';
+		return $when . ' /usr/bin/python3 ' . $path . ' >/dev/null 2>&1';
 	}
 
 	// ------------------------------------------------------------------

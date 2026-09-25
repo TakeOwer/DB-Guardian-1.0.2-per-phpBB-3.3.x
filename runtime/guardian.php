@@ -19,7 +19,7 @@ if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg' || defined('DBGUARDIAN_LOADED'))
 	return;
 }
 
-define('DBGUARDIAN_LOADED', '1.0.1');
+define('DBGUARDIAN_LOADED', '1.0.4');
 
 $dbguardian_chain = (function ()
 {

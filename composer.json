@@ -3,7 +3,7 @@
 	"type": "phpbb-extension",
 	"description": "Sostituisce l'Errore Generale di phpBB con una pagina di servizio responsive e avvisa l'amministratore via e-mail quando il database non risponde.",
 	"homepage": "https://netshadows.de/ombra/",
-	"version": "1.0.2",
+	"version": "1.0.4",
 	"time": "2026-09-24",
 	"keywords": [
 		"phpbb",

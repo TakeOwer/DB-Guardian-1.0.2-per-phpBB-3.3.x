@@ -48,15 +48,15 @@ class main_module
 
 		$this->language->add_lang('dbguardian_acp', 'salvocortesiano/dbguardian');
 
-		if (!$this->manager->load_core())
-		{
-			trigger_error($this->language->lang('DBGUARDIAN_CORE_MISSING'), E_USER_WARNING);
-		}
-
 		// After an update of the extension files, bring the copy in store/dbguardian/ up to date.
 		if (is_file($this->manager->config_path()) && $this->manager->runtime_outdated())
 		{
 			$this->manager->deploy();
+		}
+
+		if (!$this->manager->load_core())
+		{
+			trigger_error($this->language->lang('DBGUARDIAN_CORE_MISSING'), E_USER_WARNING);
 		}
 
 		add_form_key(self::FORM_KEY);
@@ -69,6 +69,10 @@ class main_module
 
 			case 'log':
 				$this->log();
+			break;
+
+			case 'monitor':
+				$this->monitor();
 			break;
 
 			default:
@@ -503,6 +507,281 @@ class main_module
 	}
 
 	// ------------------------------------------------------------------
+	// External monitoring
+	// ------------------------------------------------------------------
+
+	protected function monitor()
+	{
+		$this->tpl_name = 'acp_dbguardian_monitor';
+		$this->page_title = 'ACP_DBGUARDIAN_MONITOR';
+
+		$cfg = $this->manager->load();
+		$back = adm_back_link($this->u_action);
+		$errors = [];
+		$probe = null;
+
+		if ($this->request->variable('action', '') === 'download')
+		{
+			if (!check_link_hash($this->request->variable('hash', ''), 'dbguardian_watchdog'))
+			{
+				trigger_error($this->language->lang('FORM_INVALID') . $back, E_USER_WARNING);
+			}
+			$script = $this->manager->watchdog_script($cfg);
+			if ($script === false)
+			{
+				trigger_error($this->language->lang('DBGUARDIAN_WD_TEMPLATE_MISSING') . $back, E_USER_WARNING);
+			}
+			header('Content-Type: text/x-python; charset=UTF-8');
+			header('Content-Disposition: attachment; filename="dbguardian_watchdog.py"');
+			header('Content-Length: ' . strlen($script));
+			header('Cache-Control: no-store');
+			echo $script;
+			garbage_collection();
+			exit_handler();
+		}
+
+		foreach (['dbg_health_key', 'dbg_health_probe', 'dbg_monitor_save'] as $post_action)
+		{
+			if ($this->request->is_set_post($post_action) && !check_form_key(self::FORM_KEY))
+			{
+				trigger_error($this->language->lang('FORM_INVALID') . $back, E_USER_WARNING);
+			}
+		}
+
+		if ($this->request->is_set_post('dbg_health_key'))
+		{
+			$cfg['health_key'] = bin2hex(random_bytes(16));
+			$this->manager->save($cfg);
+			trigger_error($this->language->lang('DBGUARDIAN_WD_KEY_RENEWED') . $back);
+		}
+
+		if ($this->request->is_set_post('dbg_health_probe'))
+		{
+			$probe = $this->manager->health_probe();
+		}
+
+		if ($this->request->is_set_post('dbg_monitor_save'))
+		{
+			$new = $this->read_monitor_form($cfg);
+			$errors = $this->validate_monitor($new);
+			if (!$errors)
+			{
+				if (!$this->manager->save($new))
+				{
+					trigger_error($this->language->lang('DBGUARDIAN_ERR_CONFIG_WRITE_FAILED', $this->manager->store_dir()) . $back, E_USER_WARNING);
+				}
+				trigger_error($this->language->lang('DBGUARDIAN_WD_SAVED') . $back);
+			}
+			$cfg = $new;
+		}
+
+		$w = $this->manager->watchdog_settings($cfg);
+		$last = $this->manager->last_health_request();
+		$last_time = isset($last['time']) ? (int) $last['time'] : 0;
+		$stale_after = max(5, 3 * (int) $w['interval']) * 60;
+		$script_path = '/opt/dbguardian/dbguardian_watchdog.py';
+
+		$this->template->assign_vars([
+			'U_ACTION'            => $this->u_action,
+			'S_ERROR'             => (bool) $errors,
+			'ERROR_MSG'           => implode('<br>', $errors),
+			'S_GUARDIAN_LOADED'   => $this->manager->status()['loaded'],
+
+			'HEALTH_ENABLED'      => (bool) $cfg['health_enabled'],
+			'HEALTH_URL'          => $this->manager->health_url($cfg),
+			'U_DOWNLOAD'          => $this->u_action . '&amp;action=download&amp;hash=' . generate_link_hash('dbguardian_watchdog'),
+			'S_READY'             => (bool) $cfg['health_enabled'] && (trim($w['recipients']) !== '' && $w['smtp_host'] !== '' || $w['telegram_token'] !== ''),
+
+			'S_LAST'              => $last_time > 0,
+			'LAST_TIME'           => $last_time ? $this->user->format_date($last_time) : '',
+			'LAST_AGO'            => $last_time ? $this->ago(time() - $last_time) : '',
+			'LAST_STALE'          => $last_time > 0 && time() - $last_time > $stale_after,
+			'LAST_IP'             => isset($last['ip']) ? $last['ip'] : '',
+			'LAST_UA'             => isset($last['ua']) ? $last['ua'] : '',
+			'LAST_DB'             => isset($last['db']) ? $last['db'] : '',
+			'LAST_IS_WATCHDOG'    => isset($last['ua']) && strpos($last['ua'], 'DBGuardian-Watchdog') === 0,
+
+			'S_PROBE'             => $probe !== null,
+			'PROBE_OK'            => $probe !== null && $probe['ok'],
+			'PROBE_DB'            => $probe !== null ? $probe['db'] : '',
+			'PROBE_MS'            => $probe !== null ? $probe['db_ms'] : 0,
+			'PROBE_ERROR'         => $probe !== null && $probe['db_error'] === 'RELOAD' ? $this->language->lang('DBGUARDIAN_WD_PROBE_RELOAD') : ($probe !== null && $probe['db_error'] !== '' ? ($probe['db_code'] ? $probe['db_code'] . ': ' : '') . $probe['db_error'] : ''),
+
+			'WD_INTERVAL'         => (int) $w['interval'],
+			'WD_THRESHOLD'        => (int) $w['threshold'],
+			'WD_TIMEOUT'          => (int) $w['timeout'],
+			'WD_REALERT'          => (int) $w['realert_minutes'],
+			'WD_SSL_DAYS'         => (int) $w['ssl_warn_days'],
+			'WD_RECIPIENTS'       => $w['recipients'],
+			'WD_SMTP_HOST'        => $w['smtp_host'],
+			'WD_SMTP_PORT'        => (int) $w['smtp_port'],
+			'WD_SMTP_SECURITY'    => $w['smtp_security'],
+			'WD_SMTP_USER'        => $w['smtp_user'],
+			'WD_SMTP_PASS_SET'    => $w['smtp_pass'] !== '',
+			'WD_SMTP_FROM'        => $w['smtp_from'],
+			'WD_SMTP_FROM_NAME'   => $w['smtp_from_name'],
+			'WD_SMTP_VERIFY'      => (bool) $w['smtp_verify'],
+			'WD_TG_TOKEN_SET'     => $w['telegram_token'] !== '',
+			'WD_TG_CHAT'          => $w['telegram_chat'],
+
+			'WD_SCRIPT_PATH'      => $script_path,
+			'WD_CRON_LINE'        => $this->manager->cron_line($cfg, $script_path),
+			'WD_KEYWORD'          => '"ok":true',
+		]);
+	}
+
+	protected function read_monitor_form(array $cfg)
+	{
+		$r = $this->request;
+		$new = $cfg;
+		$w = $this->manager->watchdog_settings($cfg);
+
+		$new['health_enabled'] = $r->variable('health_enabled', 0) === 1;
+		$w['interval']         = $r->variable('wd_interval', 1);
+		$w['threshold']        = $r->variable('wd_threshold', 2);
+		$w['timeout']          = $r->variable('wd_timeout', 20);
+		$w['realert_minutes']  = $r->variable('wd_realert', 60);
+		$w['ssl_warn_days']    = $r->variable('wd_ssl_days', 14);
+		$w['recipients']       = trim($r->variable('wd_recipients', ''));
+		$w['smtp_host']        = trim($r->variable('wd_smtp_host', ''));
+		$w['smtp_port']        = $r->variable('wd_smtp_port', 465);
+		$security              = $r->variable('wd_smtp_security', 'ssl');
+		$w['smtp_security']    = in_array($security, ['none', 'ssl', 'tls'], true) ? $security : 'ssl';
+		$w['smtp_user']        = htmlspecialchars_decode(trim($r->variable('wd_smtp_user', '', true)), ENT_COMPAT);
+		$w['smtp_from']        = trim($r->variable('wd_smtp_from', ''));
+		$w['smtp_from_name']   = htmlspecialchars_decode(trim($r->variable('wd_smtp_from_name', '', true)), ENT_COMPAT);
+		$w['smtp_verify']      = $r->variable('wd_smtp_verify', 0) === 1;
+		$w['telegram_chat']    = trim($r->variable('wd_tg_chat', ''));
+
+		$pass = $r->variable('wd_smtp_pass', '', true);
+		if ($r->variable('wd_smtp_pass_clear', 0) === 1)
+		{
+			$w['smtp_pass'] = '';
+		}
+		else if ($pass !== '')
+		{
+			$w['smtp_pass'] = htmlspecialchars_decode($pass, ENT_COMPAT);
+		}
+
+		$token = trim($r->variable('wd_tg_token', ''));
+		if ($r->variable('wd_tg_token_clear', 0) === 1)
+		{
+			$w['telegram_token'] = '';
+		}
+		else if ($token !== '')
+		{
+			$w['telegram_token'] = $token;
+		}
+
+		$new['watchdog'] = $w;
+		return $new;
+	}
+
+	protected function validate_monitor(array $cfg)
+	{
+		$errors = [];
+		$lang = $this->language;
+		$w = $cfg['watchdog'];
+
+		$ranges = [
+			['interval', 'DBGUARDIAN_WD_INTERVAL', 1, 15],
+			['threshold', 'DBGUARDIAN_WD_THRESHOLD', 1, 5],
+			['timeout', 'DBGUARDIAN_WD_TIMEOUT', 5, 60],
+			['realert_minutes', 'DBGUARDIAN_WD_REALERT', 15, 1440],
+			['ssl_warn_days', 'DBGUARDIAN_WD_SSL_DAYS', 0, 60],
+		];
+		foreach ($ranges as $range)
+		{
+			if ($w[$range[0]] < $range[2] || $w[$range[0]] > $range[3])
+			{
+				$errors[] = $lang->lang('DBGUARDIAN_ERR_RANGE', $lang->lang($range[1]), $range[2], $range[3]);
+			}
+		}
+		foreach (preg_split('/[\s,;]+/', $w['recipients'], -1, PREG_SPLIT_NO_EMPTY) as $addr)
+		{
+			if (!filter_var($addr, FILTER_VALIDATE_EMAIL))
+			{
+				$errors[] = $lang->lang('DBGUARDIAN_ERR_EMAIL', $addr);
+			}
+		}
+		if ($w['smtp_from'] !== '' && !filter_var($w['smtp_from'], FILTER_VALIDATE_EMAIL))
+		{
+			$errors[] = $lang->lang('DBGUARDIAN_ERR_EMAIL', $w['smtp_from']);
+		}
+		if ($w['smtp_host'] !== '' && ($w['smtp_port'] < 1 || $w['smtp_port'] > 65535))
+		{
+			$errors[] = $lang->lang('DBGUARDIAN_ERR_RANGE', $lang->lang('DBGUARDIAN_SMTP_PORT'), 1, 65535);
+		}
+		if ($w['smtp_host'] !== '' && trim($w['recipients']) === '')
+		{
+			$errors[] = $lang->lang('DBGUARDIAN_ERR_NO_RECIPIENTS');
+		}
+		if ($w['telegram_token'] !== '' && !preg_match('/^\d+:[A-Za-z0-9_-]{20,}$/', $w['telegram_token']))
+		{
+			$errors[] = $lang->lang('DBGUARDIAN_WD_ERR_TOKEN');
+		}
+		if (($w['telegram_token'] !== '') !== ($w['telegram_chat'] !== ''))
+		{
+			$errors[] = $lang->lang('DBGUARDIAN_WD_ERR_TELEGRAM_PAIR');
+		}
+		if ($w['telegram_chat'] !== '' && !preg_match('/^(-?\d+|@[A-Za-z0-9_]{5,})$/', $w['telegram_chat']))
+		{
+			$errors[] = $lang->lang('DBGUARDIAN_WD_ERR_CHAT');
+		}
+		if ($cfg['health_enabled'] && $w['smtp_host'] === '' && $w['telegram_token'] === '')
+		{
+			$errors[] = $lang->lang('DBGUARDIAN_WD_ERR_NO_CHANNEL');
+		}
+		return $errors;
+	}
+
+	/**
+	 * The hint for the administrator, from the language files of the board.
+	 */
+	protected function hint_text(array $inc)
+	{
+		$key = 'DBGUARDIAN_HINT_' . (int) $inc['code'];
+		if ((int) $inc['code'] && $this->language->is_set($key))
+		{
+			return $this->language->lang($key);
+		}
+		$cause = \DbGuardianCore::cause($inc);
+		if ($cause === 'memory' || $cause === 'timeout')
+		{
+			return $this->language->lang('DBGUARDIAN_HINT_' . strtoupper($cause));
+		}
+		return $inc['category'] === 'db_connect' ? $this->language->lang('DBGUARDIAN_HINT_DB_CONNECT') : '';
+	}
+
+	protected function duration($seconds)
+	{
+		$seconds = max(0, (int) $seconds);
+		if ($seconds < 5400)
+		{
+			return $this->language->lang('DBGUARDIAN_WD_DURATION_MINUTES', max(1, (int) round($seconds / 60)));
+		}
+		return $this->language->lang('DBGUARDIAN_WD_DURATION_HOURS', (int) round($seconds / 3600));
+	}
+
+	protected function ago($seconds)
+	{
+		$seconds = max(0, (int) $seconds);
+		if ($seconds < 90)
+		{
+			return $this->language->lang('DBGUARDIAN_WD_AGO_SECONDS', $seconds);
+		}
+		if ($seconds < 5400)
+		{
+			return $this->language->lang('DBGUARDIAN_WD_AGO_MINUTES', (int) round($seconds / 60));
+		}
+		if ($seconds < 172800)
+		{
+			return $this->language->lang('DBGUARDIAN_WD_AGO_HOURS', (int) round($seconds / 3600));
+		}
+		return $this->language->lang('DBGUARDIAN_WD_AGO_DAYS', (int) round($seconds / 86400));
+	}
+
+	// ------------------------------------------------------------------
 	// Event log
 	// ------------------------------------------------------------------
 
@@ -554,7 +833,7 @@ class main_module
 				'CATEGORY'    => $inc['category'],
 				'CAT_LABEL'   => $this->language->is_set('DBGUARDIAN_CAT_' . strtoupper($inc['category'])) ? $this->language->lang('DBGUARDIAN_CAT_' . strtoupper($inc['category'])) : $inc['category'],
 				'CODE'        => $is_recovery ? '' : \DbGuardianCore::error_code($inc),
-				'MESSAGE'     => $inc['message'],
+				'MESSAGE'     => ($is_recovery && !empty($row['down_since'])) ? $this->language->lang('DBGUARDIAN_RECOVERY_MESSAGE', $this->user->format_date((int) $row['down_since']), $this->duration((int) $inc['time'] - (int) $row['down_since']), (int) (isset($row['down_count']) ? $row['down_count'] : 0)) : $inc['message'],
 				'TITLE'       => $inc['title'],
 				'URL'         => $inc['url'],
 				'IP'          => $inc['ip'],
@@ -562,7 +841,7 @@ class main_module
 				'FILE'        => $inc['file'] !== '' ? $inc['file'] . ':' . $inc['line'] : '',
 				'SQL'         => $inc['sql'],
 				'TRACE'       => $inc['trace'],
-				'HINT'        => $is_recovery ? '' : \DbGuardianCore::admin_hint($inc),
+				'HINT'        => $is_recovery ? '' : $this->hint_text($inc),
 				'REPEATS'     => (int) $inc['repeats'],
 				'MAIL_STATE'  => $mail_state,
 				'MAIL_TEXT'   => $this->language->lang('DBGUARDIAN_MAIL_' . strtoupper($mail_state)),

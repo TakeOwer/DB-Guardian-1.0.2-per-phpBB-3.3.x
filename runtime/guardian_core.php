@@ -20,7 +20,7 @@ if (!class_exists('DbGuardianCore', false))
 
 final class DbGuardianCore
 {
-	const VERSION = '1.0.1';
+	const VERSION = '1.0.4';
 	const CHUNK = 1048576;
 
 	/** MySQL/MariaDB error codes meaning "the database cannot be reached". */
@@ -82,6 +82,9 @@ final class DbGuardianCore
 			'smtp_verify_peer' => true,
 			'chain_prepend'    => '',
 			'log_months'       => 6,
+			'health_enabled'   => false,
+			'health_key'       => '',
+			'watchdog'         => [],
 		];
 	}
 
@@ -90,6 +93,7 @@ final class DbGuardianCore
 		$cfg = array_merge(self::defaults(), $cfg);
 		$cfg['notify'] = is_array($cfg['notify']) ? $cfg['notify'] : [];
 		$cfg['exclude_paths'] = is_array($cfg['exclude_paths']) ? $cfg['exclude_paths'] : [];
+		$cfg['watchdog'] = is_array($cfg['watchdog']) ? $cfg['watchdog'] : [];
 		$cfg['throttle_minutes'] = max(1, (int) $cfg['throttle_minutes']);
 		$cfg['retry_seconds'] = max(0, (int) $cfg['retry_seconds']);
 		$cfg['smtp_port'] = (int) $cfg['smtp_port'];
@@ -123,6 +127,19 @@ final class DbGuardianCore
 			if ($path !== '' && strpos($script, (string) $path) !== false)
 			{
 				return;
+			}
+		}
+
+		// Status endpoint for the external watchdog: /?dbguardian_health=KEY
+		// Answers before phpBB starts and never reaches the rest of the forum.
+		$health = isset(self::$query['dbguardian_health']) && is_string(self::$query['dbguardian_health']) ? self::$query['dbguardian_health'] : '';
+		if ($health !== '' && !empty(self::$cfg['health_enabled']))
+		{
+			$key = (string) self::$cfg['health_key'];
+			if (strlen($key) >= 16 && hash_equals($key, $health))
+			{
+				self::serve_health();
+				exit;
 			}
 		}
 
@@ -427,6 +444,132 @@ final class DbGuardianCore
 		return $inc;
 	}
 
+	// ------------------------------------------------------------------
+	// Health endpoint for the external watchdog
+	// ------------------------------------------------------------------
+
+	private static function serve_health()
+	{
+		$data = self::health_data();
+
+		self::ensure_dirs();
+		@file_put_contents(self::$dir . '/state/health.json', json_encode([
+			'time' => time(),
+			'ip'   => self::masked_ip(),
+			'ua'   => self::cut(self::srv('HTTP_USER_AGENT'), 0, 120),
+			'db'   => $data['db'],
+		]), LOCK_EX);
+
+		if (!headers_sent())
+		{
+			$proto = preg_match('#^HTTP/\d(\.\d)?$#', self::srv('SERVER_PROTOCOL')) ? self::srv('SERVER_PROTOCOL') : 'HTTP/1.1';
+			if ($data['ok'])
+			{
+				header($proto . ' 200 OK', true, 200);
+			}
+			else
+			{
+				header($proto . ' 503 Service Unavailable', true, 503);
+			}
+			header('Content-Type: application/json; charset=UTF-8');
+			header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+			header('X-Robots-Tag: noindex, nofollow');
+		}
+		echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+	}
+
+	/**
+	 * PHP is answering (this code runs); checks MySQL with the credentials of phpBB's
+	 * config.php, with a short timeout and without loading phpBB.
+	 */
+	public static function health_data()
+	{
+		$start = microtime(true);
+		$db = self::check_database();
+
+		return [
+			'ok'         => $db['status'] !== 'fail',
+			'php'        => PHP_VERSION,
+			'db'         => $db['status'],
+			'db_ms'      => $db['ms'],
+			'db_code'    => $db['code'],
+			'db_error'   => $db['error'],
+			'down_flag'  => is_file(self::$dir . '/state/down.flag'),
+			'guardian'   => self::VERSION,
+			'time'       => time(),
+			'elapsed_ms' => (int) round((microtime(true) - $start) * 1000),
+		];
+	}
+
+	private static function check_database()
+	{
+		$out = ['status' => 'skip', 'ms' => 0, 'code' => 0, 'error' => ''];
+		$config = dirname(dirname(self::$dir)) . '/config.php';
+		if (!is_file($config) || !function_exists('mysqli_init'))
+		{
+			$out['error'] = !is_file($config) ? 'config.php not found' : 'mysqli not available';
+			return $out;
+		}
+
+		$vars = (function ($file)
+		{
+			$dbms = $dbhost = $dbport = $dbname = $dbuser = $dbpasswd = '';
+			include $file;
+			return compact('dbms', 'dbhost', 'dbport', 'dbname', 'dbuser', 'dbpasswd');
+		})($config);
+
+		if (stripos((string) $vars['dbms'], 'mysql') === false)
+		{
+			$out['error'] = 'unsupported dbms ' . $vars['dbms'];
+			return $out;
+		}
+
+		$port = null;
+		$socket = null;
+		if ($vars['dbport'] !== '' && $vars['dbport'] !== null)
+		{
+			if (is_numeric($vars['dbport']))
+			{
+				$port = (int) $vars['dbport'];
+			}
+			else
+			{
+				$socket = (string) $vars['dbport'];
+			}
+		}
+
+		$start = microtime(true);
+		mysqli_report(MYSQLI_REPORT_OFF);
+		$link = mysqli_init();
+		@mysqli_options($link, MYSQLI_OPT_CONNECT_TIMEOUT, 3);
+		$ok = false;
+		try
+		{
+			$ok = @mysqli_real_connect($link, (string) $vars['dbhost'], (string) $vars['dbuser'], (string) $vars['dbpasswd'], (string) $vars['dbname'], $port, $socket);
+			if ($ok)
+			{
+				$ok = (bool) @mysqli_query($link, 'SELECT 1');
+			}
+		}
+		catch (\Throwable $e)
+		{
+			$ok = false;
+			$out['code'] = (int) $e->getCode();
+			$out['error'] = self::cut($e->getMessage(), 0, 200);
+		}
+
+		if (!$ok && $out['error'] === '')
+		{
+			$out['code'] = (int) (mysqli_connect_errno() ?: @mysqli_errno($link));
+			$out['error'] = self::cut((string) (mysqli_connect_error() ?: @mysqli_error($link)), 0, 200);
+		}
+		@mysqli_close($link);
+
+		$out['status'] = $ok ? 'ok' : 'fail';
+		$out['ms'] = (int) round((microtime(true) - $start) * 1000);
+		return $out;
+	}
+
 	public static function is_connect_error($code, $message)
 	{
 		if ($code && in_array((int) $code, self::CONNECT_CODES, true))
@@ -692,6 +835,8 @@ final class DbGuardianCore
 		$entry['code'] = (int) $down['code'];
 		$entry['title'] = 'Recovery';
 		$entry['message'] = sprintf('Fuori servizio dal %s per %s, %d richieste fallite', self::format_time((int) $down['since']), self::duration($now - (int) $down['since']), (int) $down['count']);
+		$entry['down_since'] = (int) $down['since'];
+		$entry['down_count'] = (int) $down['count'];
 		$entry['url'] = self::current_url();
 		$entry['mail'] = 'off';
 
@@ -775,53 +920,57 @@ final class DbGuardianCore
 		return self::send_mail(self::recipients(), $subject, self::mail_text($intro, $rows, '', '', $outro), self::mail_html($intro, $rows, '', '', $outro, '#1f7a4d'));
 	}
 
-	public static function admin_hint(array $inc)
+	/**
+	 * What the administrator should check. Italian for e-mails; the service page passes its language.
+	 */
+	public static function admin_hint(array $inc, $lang = 'it')
 	{
+		$en = $lang === 'en';
 		$c = (int) $inc['code'];
 		$hints = [
-			1040 => 'Il server MySQL ha raggiunto max_connections: traffico eccessivo, bot aggressivi o connessioni che restano aperte.',
-			1203 => 'Superato il limite max_user_connections dell\'utente del database: è un limite del piano di hosting. Contatta il provider se si ripete.',
-			1226 => 'L\'utente del database ha esaurito una risorsa (max_questions, max_updates o max_connections_per_hour) imposta dal provider.',
-			1129 => 'L\'host è stato bloccato da MySQL per troppi errori di connessione: serve un FLUSH HOSTS da parte del provider.',
-			1044 => 'L\'utente del database non ha i permessi sul database indicato in config.php.',
-			1045 => 'Credenziali rifiutate: controlla utente e password in config.php o se la password del database è stata cambiata.',
-			1049 => 'Il database indicato in config.php non esiste.',
-			1130 => 'L\'host del forum non è autorizzato a collegarsi al server MySQL.',
-			1053 => 'Il server MySQL è in fase di arresto o di riavvio.',
-			2002 => 'Il server MySQL non è attivo o il socket locale non è raggiungibile.',
-			2003 => 'Il server MySQL non risponde sulla porta configurata.',
-			2005 => 'Il nome host del database in config.php non viene risolto.',
-			2006 => 'La connessione è caduta (MySQL server has gone away): timeout, riavvio o pacchetto troppo grande.',
-			2013 => 'Connessione persa durante la richiesta: riavvio o sovraccarico del server MySQL.',
-			1146 => 'Tabella mancante: aggiornamento o migrazione di un\'estensione interrotta, o estensione rimossa senza disinstallarla.',
-			1054 => 'Colonna sconosciuta: la migrazione di un\'estensione o di phpBB non è stata completata.',
-			126  => 'Indice di una tabella danneggiato: esegui REPAIR TABLE da phpMyAdmin.',
-			144  => 'Tabella danneggiata: esegui REPAIR TABLE da phpMyAdmin.',
-			145  => 'Tabella segnata come danneggiata: esegui REPAIR TABLE da phpMyAdmin.',
-			1194 => 'Tabella danneggiata: esegui REPAIR TABLE da phpMyAdmin.',
-			1195 => 'Tabella danneggiata e riparazione automatica fallita: esegui REPAIR TABLE.',
-			1205 => 'Timeout di attesa di un lock: un\'altra operazione teneva occupata la tabella.',
-			1213 => 'Deadlock tra due operazioni: di solito è occasionale.',
-			28   => 'Spazio su disco esaurito sul server del database.',
-			1021 => 'Spazio su disco esaurito sul server del database.',
-			1114 => 'Tabella piena: spazio o quota del database esauriti.',
+			1040 => ['Il server MySQL ha raggiunto max_connections: traffico eccessivo, bot aggressivi o connessioni che restano aperte.', 'The MySQL server reached max_connections: heavy traffic, aggressive bots or connections left open.'],
+			1203 => ['Superato il limite max_user_connections dell\'utente del database: è un limite del piano di hosting. Contatta il provider se si ripete.', 'The database user exceeded max_user_connections: it is a limit of the hosting plan. Contact the provider if it happens again.'],
+			1226 => ['L\'utente del database ha esaurito una risorsa (max_questions, max_updates o max_connections_per_hour) imposta dal provider.', 'The database user ran out of a resource (max_questions, max_updates or max_connections_per_hour) set by the provider.'],
+			1129 => ['L\'host è stato bloccato da MySQL per troppi errori di connessione: serve un FLUSH HOSTS da parte del provider.', 'The host was blocked by MySQL after too many connection errors: the provider must run FLUSH HOSTS.'],
+			1044 => ['L\'utente del database non ha i permessi sul database indicato in config.php.', 'The database user has no permissions on the database set in config.php.'],
+			1045 => ['Credenziali rifiutate: controlla utente e password in config.php o se la password del database è stata cambiata.', 'Credentials rejected: check user and password in config.php or whether the database password was changed.'],
+			1049 => ['Il database indicato in config.php non esiste.', 'The database set in config.php does not exist.'],
+			1130 => ['L\'host del forum non è autorizzato a collegarsi al server MySQL.', 'The forum host is not allowed to connect to the MySQL server.'],
+			1053 => ['Il server MySQL è in fase di arresto o di riavvio.', 'The MySQL server is shutting down or restarting.'],
+			2002 => ['Il server MySQL non è attivo o il socket locale non è raggiungibile.', 'The MySQL server is not running or the local socket cannot be reached.'],
+			2003 => ['Il server MySQL non risponde sulla porta configurata.', 'The MySQL server does not answer on the configured port.'],
+			2005 => ['Il nome host del database in config.php non viene risolto.', 'The database host name in config.php cannot be resolved.'],
+			2006 => ['La connessione è caduta (MySQL server has gone away): timeout, riavvio o pacchetto troppo grande.', 'The connection dropped (MySQL server has gone away): timeout, restart or packet too large.'],
+			2013 => ['Connessione persa durante la richiesta: riavvio o sovraccarico del server MySQL.', 'Connection lost during the query: MySQL restart or overload.'],
+			1146 => ['Tabella mancante: aggiornamento o migrazione di un\'estensione interrotta, o estensione rimossa senza disinstallarla.', 'Missing table: an update or extension migration was interrupted, or an extension was removed without uninstalling it.'],
+			1054 => ['Colonna sconosciuta: la migrazione di un\'estensione o di phpBB non è stata completata.', 'Unknown column: a phpBB or extension migration did not complete.'],
+			126  => ['Indice di una tabella danneggiato: esegui REPAIR TABLE da phpMyAdmin.', 'A table index is damaged: run REPAIR TABLE from phpMyAdmin.'],
+			144  => ['Tabella danneggiata: esegui REPAIR TABLE da phpMyAdmin.', 'Damaged table: run REPAIR TABLE from phpMyAdmin.'],
+			145  => ['Tabella segnata come danneggiata: esegui REPAIR TABLE da phpMyAdmin.', 'Table marked as crashed: run REPAIR TABLE from phpMyAdmin.'],
+			1194 => ['Tabella danneggiata: esegui REPAIR TABLE da phpMyAdmin.', 'Damaged table: run REPAIR TABLE from phpMyAdmin.'],
+			1195 => ['Tabella danneggiata e riparazione automatica fallita: esegui REPAIR TABLE.', 'Damaged table and automatic repair failed: run REPAIR TABLE.'],
+			1205 => ['Timeout di attesa di un lock: un\'altra operazione teneva occupata la tabella.', 'Lock wait timeout: another operation was holding the table.'],
+			1213 => ['Deadlock tra due operazioni: di solito è occasionale.', 'Deadlock between two operations: usually occasional.'],
+			28   => ['Spazio su disco esaurito sul server del database.', 'The database server ran out of disk space.'],
+			1021 => ['Spazio su disco esaurito sul server del database.', 'The database server ran out of disk space.'],
+			1114 => ['Tabella piena: spazio o quota del database esauriti.', 'Table full: database space or quota exhausted.'],
 		];
 		if (isset($hints[$c]))
 		{
-			return $hints[$c];
+			return $hints[$c][$en ? 1 : 0];
 		}
 		$cause = self::cause($inc);
 		if ($cause === 'memory')
 		{
-			return 'Memoria PHP esaurita: aumenta memory_limit o individua la pagina o l\'estensione che la consuma.';
+			return $en ? 'PHP memory exhausted: raise memory_limit or find the page or extension that uses it.' : 'Memoria PHP esaurita: aumenta memory_limit o individua la pagina o l\'estensione che la consuma.';
 		}
 		if ($cause === 'timeout')
 		{
-			return 'Tempo massimo di esecuzione superato: controlla la pagina indicata e le estensioni coinvolte.';
+			return $en ? 'Maximum execution time exceeded: check the page shown and the extensions involved.' : 'Tempo massimo di esecuzione superato: controlla la pagina indicata e le estensioni coinvolte.';
 		}
 		if ($inc['category'] === 'db_connect')
 		{
-			return 'Il forum non riesce a collegarsi al database: verifica lo stato di MySQL dal pannello DirectAdmin o con il provider.';
+			return $en ? 'The forum cannot connect to the database: check the MySQL status in the hosting panel or with the provider.' : 'Il forum non riesce a collegarsi al database: verifica lo stato di MySQL dal pannello DirectAdmin o con il provider.';
 		}
 		return '';
 	}
@@ -1224,11 +1373,12 @@ final class DbGuardianCore
 		$details = '';
 		if (!empty($inc['test']) || self::is_debug_viewer())
 		{
+			$en = $L['lang'] === 'en';
 			$rows = [
-				'Categoria' => self::category_label($inc['category']),
-				'Origine'   => $inc['source'],
-				'Titolo'    => $inc['title'],
-				'Messaggio' => $inc['message'],
+				($en ? 'Category' : 'Categoria') => self::category_label($inc['category'], $L['lang']),
+				($en ? 'Source' : 'Origine')     => $inc['source'],
+				($en ? 'Title' : 'Titolo')       => $inc['title'],
+				($en ? 'Message' : 'Messaggio')  => $inc['message'],
 			];
 			if ($inc['file'] !== '')
 			{
@@ -1240,16 +1390,16 @@ final class DbGuardianCore
 			}
 			if ($inc['trace'] !== '')
 			{
-				$rows['Traccia'] = $inc['trace'];
+				$rows[$en ? 'Trace' : 'Traccia'] = $inc['trace'];
 			}
 			if (isset($inc['mail']))
 			{
 				$rows['E-mail'] = $inc['mail'];
 			}
-			$hint = self::admin_hint($inc);
+			$hint = self::admin_hint($inc, $L['lang']);
 			if ($hint !== '')
 			{
-				$rows['Cosa controllare'] = $hint;
+				$rows[$en ? 'What to check' : 'Cosa controllare'] = $hint;
 			}
 			$details = '<details class="tech"' . (!empty($inc['test']) ? '' : ' open') . '><summary>' . $e($L['details']) . '</summary><dl>';
 			foreach ($rows as $k => $v)
@@ -1368,16 +1518,16 @@ footer{padding:1rem clamp(1.25rem,5vw,3rem) 1.5rem;color:var(--muted);font-size:
 	// Helpers
 	// ------------------------------------------------------------------
 
-	public static function category_label($cat)
+	public static function category_label($cat, $lang = 'it')
 	{
 		$labels = [
-			'db_connect' => 'Database non raggiungibile',
-			'db_query'   => 'Errore SQL',
-			'php_fatal'  => 'Errore fatale PHP',
-			'app'        => 'Errore generale phpBB',
-			'recovery'   => 'Forum di nuovo online',
+			'db_connect' => ['Database non raggiungibile', 'Database unreachable'],
+			'db_query'   => ['Errore SQL', 'SQL error'],
+			'php_fatal'  => ['Errore fatale PHP', 'PHP fatal error'],
+			'app'        => ['Errore generale phpBB', 'phpBB general error'],
+			'recovery'   => ['Forum di nuovo online', 'Forum back online'],
 		];
-		return isset($labels[$cat]) ? $labels[$cat] : $cat;
+		return isset($labels[$cat]) ? $labels[$cat][$lang === 'en' ? 1 : 0] : $cat;
 	}
 
 	private static function is_key($value)
@@ -1432,7 +1582,7 @@ footer{padding:1rem clamp(1.25rem,5vw,3rem) 1.5rem;color:var(--muted);font-size:
 	{
 		self::ensure_dirs();
 		$keep = ['time', 'ref', 'category', 'code', 'title', 'message', 'driver', 'sql', 'file', 'line', 'trace', 'source',
-			'url', 'method', 'ip', 'ua', 'repeats', 'suppressed', 'mail'];
+			'url', 'method', 'ip', 'ua', 'repeats', 'suppressed', 'mail', 'down_since', 'down_count'];
 		$row = [];
 		foreach ($keep as $k)
 		{

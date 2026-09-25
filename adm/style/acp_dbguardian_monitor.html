@@ -1,0 +1,194 @@
+{% include 'overall_header.html' %}
+
+<h1>{{ lang('ACP_DBGUARDIAN_MONITOR') }}</h1>
+{% include 'acp_dbguardian_badges.html' %}
+
+<p>{{ lang('DBGUARDIAN_WD_EXPLAIN') }}</p>
+
+{% if S_ERROR %}
+<div class="errorbox"><h3>{{ lang('WARNING') }}</h3><p>{{ ERROR_MSG }}</p></div>
+{% endif %}
+
+{% if not S_GUARDIAN_LOADED %}
+<div class="dbg-hint"><p>{{ lang('DBGUARDIAN_WD_GUARDIAN_OFF') }}</p></div>
+{% endif %}
+
+{% if S_PROBE %}
+	{% if PROBE_OK %}
+<div class="dbg-ok-box"><strong>{{ lang('DBGUARDIAN_WD_PROBE_OK', PROBE_MS) }}</strong></div>
+	{% else %}
+<div class="dbg-ko-box"><strong>{{ lang('DBGUARDIAN_WD_PROBE_FAIL') }}</strong> {{ PROBE_ERROR }}</div>
+	{% endif %}
+{% endif %}
+
+<form id="dbguardian_monitor" method="post" action="{{ U_ACTION }}">
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_WD_STATUS') }}</legend>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_WD_ENDPOINT') }}</label><br><span>{{ lang('DBGUARDIAN_WD_ENDPOINT_EXPLAIN') }}</span></dt>
+		<dd>{% if HEALTH_ENABLED %}<span class="dbg-ok">{{ lang('DBGUARDIAN_WD_ENDPOINT_ON') }}</span><br><span class="dbg-mono">{{ HEALTH_URL }}</span>{% else %}<span class="dbg-ko">{{ lang('DBGUARDIAN_WD_ENDPOINT_OFF') }}</span>{% endif %}</dd>
+	</dl>
+	<dl>
+		<dt><label>{{ lang('DBGUARDIAN_WD_LAST') }}</label><br><span>{{ lang('DBGUARDIAN_WD_LAST_EXPLAIN') }}</span></dt>
+		<dd>
+		{% if S_LAST %}
+			{% if LAST_STALE %}<span class="dbg-ko">{{ lang('DBGUARDIAN_WD_LAST_STALE', LAST_AGO) }}</span>{% else %}<span class="dbg-ok">{{ LAST_AGO }}</span>{% endif %}
+			<br>{{ LAST_TIME }} | {{ LAST_IP }} | {{ lang('DBGUARDIAN_WD_LAST_DB') }}: {{ LAST_DB }}
+			{% if not LAST_IS_WATCHDOG %}<br><small>{{ lang('DBGUARDIAN_WD_LAST_NOT_WATCHDOG', LAST_UA) }}</small>{% endif %}
+		{% else %}
+			{{ lang('DBGUARDIAN_WD_LAST_NEVER') }}
+		{% endif %}
+		</dd>
+	</dl>
+	<div class="dbg-actions">
+		<input type="submit" class="button2" name="dbg_health_probe" value="{{ lang('DBGUARDIAN_WD_PROBE') }}">
+		<input type="submit" class="button2" name="dbg_health_key" value="{{ lang('DBGUARDIAN_WD_NEW_KEY') }}">
+	</div>
+	<p><small>{{ lang('DBGUARDIAN_WD_KEY_EXPLAIN') }}</small></p>
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_WD_SETTINGS') }}</legend>
+	<dl>
+		<dt><label for="health_enabled">{{ lang('DBGUARDIAN_WD_ENABLE') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_ENABLE_EXPLAIN') }}</span></dt>
+		<dd><label><input type="radio" class="radio" id="health_enabled" name="health_enabled" value="1"{% if HEALTH_ENABLED %} checked="checked"{% endif %}> {{ lang('YES') }}</label>
+			<label><input type="radio" class="radio" name="health_enabled" value="0"{% if not HEALTH_ENABLED %} checked="checked"{% endif %}> {{ lang('NO') }}</label></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_interval">{{ lang('DBGUARDIAN_WD_INTERVAL') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_INTERVAL_EXPLAIN') }}</span></dt>
+		<dd><input type="number" class="text" id="wd_interval" name="wd_interval" value="{{ WD_INTERVAL }}" min="1" max="15"> {{ lang('DBGUARDIAN_MINUTES_UNIT') }}</dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_threshold">{{ lang('DBGUARDIAN_WD_THRESHOLD') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_THRESHOLD_EXPLAIN') }}</span></dt>
+		<dd><input type="number" class="text" id="wd_threshold" name="wd_threshold" value="{{ WD_THRESHOLD }}" min="1" max="5"></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_timeout">{{ lang('DBGUARDIAN_WD_TIMEOUT') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_TIMEOUT_EXPLAIN') }}</span></dt>
+		<dd><input type="number" class="text" id="wd_timeout" name="wd_timeout" value="{{ WD_TIMEOUT }}" min="5" max="60"> {{ lang('DBGUARDIAN_SECONDS_UNIT') }}</dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_realert">{{ lang('DBGUARDIAN_WD_REALERT') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_REALERT_EXPLAIN') }}</span></dt>
+		<dd><input type="number" class="text" id="wd_realert" name="wd_realert" value="{{ WD_REALERT }}" min="15" max="1440"> {{ lang('DBGUARDIAN_MINUTES_UNIT') }}</dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_ssl_days">{{ lang('DBGUARDIAN_WD_SSL_DAYS') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_SSL_DAYS_EXPLAIN') }}</span></dt>
+		<dd><input type="number" class="text" id="wd_ssl_days" name="wd_ssl_days" value="{{ WD_SSL_DAYS }}" min="0" max="60"> {{ lang('DBGUARDIAN_WD_DAYS_UNIT') }}</dd>
+	</dl>
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_WD_MAIL') }}</legend>
+	<p>{{ lang('DBGUARDIAN_WD_MAIL_EXPLAIN') }}</p>
+	<dl>
+		<dt><label for="wd_recipients">{{ lang('DBGUARDIAN_ADMIN_EMAILS') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_RECIPIENTS_EXPLAIN') }}</span></dt>
+		<dd><input type="text" class="text medium" id="wd_recipients" name="wd_recipients" value="{{ WD_RECIPIENTS }}" maxlength="500"></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_smtp_host">{{ lang('DBGUARDIAN_SMTP_HOST') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_SMTP_HOST_EXPLAIN') }}</span></dt>
+		<dd><input type="text" class="text medium" id="wd_smtp_host" name="wd_smtp_host" value="{{ WD_SMTP_HOST }}" maxlength="255"></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_smtp_port">{{ lang('DBGUARDIAN_SMTP_PORT') }}{{ lang('COLON') }}</label></dt>
+		<dd><input type="number" class="text" id="wd_smtp_port" name="wd_smtp_port" value="{{ WD_SMTP_PORT }}" min="1" max="65535"></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_smtp_security">{{ lang('DBGUARDIAN_SMTP_SECURITY') }}{{ lang('COLON') }}</label></dt>
+		<dd><select id="wd_smtp_security" name="wd_smtp_security">
+			<option value="ssl"{% if WD_SMTP_SECURITY == 'ssl' %} selected="selected"{% endif %}>SSL/TLS (465)</option>
+			<option value="tls"{% if WD_SMTP_SECURITY == 'tls' %} selected="selected"{% endif %}>STARTTLS (587)</option>
+			<option value="none"{% if WD_SMTP_SECURITY == 'none' %} selected="selected"{% endif %}>{{ lang('DBGUARDIAN_SMTP_NONE_SECURITY') }}</option>
+		</select></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_smtp_user">{{ lang('DBGUARDIAN_SMTP_USER') }}{{ lang('COLON') }}</label></dt>
+		<dd><input type="text" class="text medium" id="wd_smtp_user" name="wd_smtp_user" value="{{ WD_SMTP_USER }}" maxlength="255" autocomplete="off"></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_smtp_pass">{{ lang('DBGUARDIAN_SMTP_PASS') }}{{ lang('COLON') }}</label><br><span>{% if WD_SMTP_PASS_SET %}{{ lang('DBGUARDIAN_SMTP_PASS_SET') }}{% else %}{{ lang('DBGUARDIAN_SMTP_PASS_EMPTY') }}{% endif %}</span></dt>
+		<dd><input type="password" class="text medium" id="wd_smtp_pass" name="wd_smtp_pass" value="" maxlength="255" autocomplete="new-password">
+			{% if WD_SMTP_PASS_SET %}<br><label><input type="checkbox" class="radio" name="wd_smtp_pass_clear" value="1"> {{ lang('DBGUARDIAN_SMTP_PASS_CLEAR') }}</label>{% endif %}</dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_smtp_from">{{ lang('DBGUARDIAN_MAIL_FROM') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_FROM_EXPLAIN') }}</span></dt>
+		<dd><input type="email" class="text medium" id="wd_smtp_from" name="wd_smtp_from" value="{{ WD_SMTP_FROM }}" maxlength="120"></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_smtp_from_name">{{ lang('DBGUARDIAN_MAIL_FROM_NAME') }}{{ lang('COLON') }}</label></dt>
+		<dd><input type="text" class="text medium" id="wd_smtp_from_name" name="wd_smtp_from_name" value="{{ WD_SMTP_FROM_NAME }}" maxlength="120"></dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_smtp_verify">{{ lang('DBGUARDIAN_SMTP_VERIFY') }}{{ lang('COLON') }}</label></dt>
+		<dd><label><input type="radio" class="radio" id="wd_smtp_verify" name="wd_smtp_verify" value="1"{% if WD_SMTP_VERIFY %} checked="checked"{% endif %}> {{ lang('YES') }}</label>
+			<label><input type="radio" class="radio" name="wd_smtp_verify" value="0"{% if not WD_SMTP_VERIFY %} checked="checked"{% endif %}> {{ lang('NO') }}</label></dd>
+	</dl>
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_WD_TELEGRAM') }}</legend>
+	<p>{{ lang('DBGUARDIAN_WD_TELEGRAM_EXPLAIN') }}</p>
+	<dl>
+		<dt><label for="wd_tg_token">{{ lang('DBGUARDIAN_WD_TG_TOKEN') }}{{ lang('COLON') }}</label><br><span>{% if WD_TG_TOKEN_SET %}{{ lang('DBGUARDIAN_WD_TG_TOKEN_SET') }}{% else %}{{ lang('DBGUARDIAN_WD_TG_TOKEN_EXPLAIN') }}{% endif %}</span></dt>
+		<dd><input type="password" class="text medium" id="wd_tg_token" name="wd_tg_token" value="" maxlength="100" autocomplete="off">
+			{% if WD_TG_TOKEN_SET %}<br><label><input type="checkbox" class="radio" name="wd_tg_token_clear" value="1"> {{ lang('DBGUARDIAN_WD_TG_TOKEN_CLEAR') }}</label>{% endif %}</dd>
+	</dl>
+	<dl>
+		<dt><label for="wd_tg_chat">{{ lang('DBGUARDIAN_WD_TG_CHAT') }}{{ lang('COLON') }}</label><br><span>{{ lang('DBGUARDIAN_WD_TG_CHAT_EXPLAIN') }}</span></dt>
+		<dd><input type="text" class="text medium" id="wd_tg_chat" name="wd_tg_chat" value="{{ WD_TG_CHAT }}" maxlength="64"></dd>
+	</dl>
+</fieldset>
+
+<fieldset class="submit-buttons">
+	<input class="button1" type="submit" name="dbg_monitor_save" value="{{ lang('SUBMIT') }}">
+	{{ S_FORM_TOKEN }}
+</fieldset>
+</form>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_WD_DOWNLOAD') }}</legend>
+	{% if S_READY %}
+	<p>{{ lang('DBGUARDIAN_WD_DOWNLOAD_EXPLAIN') }}</p>
+	<p><a class="button1" href="{{ U_DOWNLOAD }}" style="display:inline-block;padding:4px 12px;text-decoration:none">{{ lang('DBGUARDIAN_WD_DOWNLOAD_BUTTON') }}</a></p>
+	{% else %}
+	<p class="dbg-ko">{{ lang('DBGUARDIAN_WD_NOT_READY') }}</p>
+	{% endif %}
+</fieldset>
+
+<fieldset>
+	<legend>{{ lang('DBGUARDIAN_WD_GUIDE') }}</legend>
+	<p>{{ lang('DBGUARDIAN_WD_GUIDE_INTRO') }}</p>
+	<ol class="dbg-steps">
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP1_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP1') }}</li>
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP2_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP2') }}</li>
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP3_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP3') }}
+			<code class="dbg-code">ssh root@{{ lang('DBGUARDIAN_WD_VPS_IP') }} "mkdir -p /opt/dbguardian"
+scp dbguardian_watchdog.py root@{{ lang('DBGUARDIAN_WD_VPS_IP') }}:/opt/dbguardian/</code>
+			{{ lang('DBGUARDIAN_WD_STEP3_ALT') }}</li>
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP4_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP4') }}
+			<code class="dbg-code">python3 --version
+chmod 700 /opt/dbguardian
+chmod 600 {{ WD_SCRIPT_PATH }}</code>
+			{{ lang('DBGUARDIAN_WD_STEP4_NOPY') }}
+			<code class="dbg-code">apt update &amp;&amp; apt install -y python3</code></li>
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP5_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP5') }}
+			<code class="dbg-code">python3 {{ WD_SCRIPT_PATH }} --check</code>
+			{{ lang('DBGUARDIAN_WD_STEP5_TEST') }}
+			<code class="dbg-code">python3 {{ WD_SCRIPT_PATH }} --test</code></li>
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP6_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP6') }}
+			<code class="dbg-code">(crontab -l 2&gt;/dev/null; echo "{{ WD_CRON_LINE }}") | crontab -
+crontab -l</code></li>
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP7_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP7') }}
+			<code class="dbg-code">tail -f /opt/dbguardian/dbguardian_watchdog.log</code></li>
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP8_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP8') }}</li>
+		<li><strong>{{ lang('DBGUARDIAN_WD_STEP9_TITLE') }}</strong>{{ lang('DBGUARDIAN_WD_STEP9') }}
+			<code class="dbg-code">crontab -l | grep -v dbguardian_watchdog | crontab -</code></li>
+	</ol>
+
+	<h3>{{ lang('DBGUARDIAN_WD_KUMA_TITLE') }}</h3>
+	<p>{{ lang('DBGUARDIAN_WD_KUMA') }}</p>
+	<code class="dbg-code">{{ lang('DBGUARDIAN_WD_KUMA_URL') }}: {{ HEALTH_URL }}
+{{ lang('DBGUARDIAN_WD_KUMA_KEYWORD') }}: {{ WD_KEYWORD }}</code>
+</fieldset>
+
+{% include 'acp_dbguardian_credits.html' %}
+{% include 'overall_footer.html' %}

@@ -22,5 +22,6 @@ $lang = array_merge($lang, [
 	'ACP_DBGUARDIAN_TITLE'    => 'DB Guardian',
 	'ACP_DBGUARDIAN_STATUS'   => 'Status and tests',
 	'ACP_DBGUARDIAN_SETTINGS' => 'Settings',
+	'ACP_DBGUARDIAN_MONITOR'  => 'External monitoring',
 	'ACP_DBGUARDIAN_LOG'      => 'Event log',
 ]);
