@@ -1,5 +1,12 @@
 # DB Guardian 1.0.4 per phpBB 3.3
 
+[b][3.1][3.2][3.3][DEV] DB Guardian 1.0.4 per phpBB 3.3[/b]
+
+![Version](https://img.shields.io/badge/version-1.0.4-105080)
+![phpBB](https://img.shields.io/badge/phpBB-3.3.x-377a33)
+![PHP](https://img.shields.io/badge/PHP-%3E%3D7.4-377a33)
+![License](https://img.shields.io/badge/license-GPL--2.0--only-7f7f7f)
+
 Sostituisce l'"Errore generale" di phpBB, le pagine bianche e gli errori 500 con una pagina di servizio responsive. La pagina spiega al visitatore cosa è successo e mostra codice errore, riferimento, data e ora. Contemporaneamente l'estensione avvisa l'amministratore via e-mail, anche quando il database è completamente irraggiungibile.
 
 ## Perché non è una normale estensione
